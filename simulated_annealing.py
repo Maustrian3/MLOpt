@@ -2,6 +2,7 @@ import math
 
 import numpy as np
 
+from meta_information import MetaInformation
 from neighborhood import Neighborhood
 from problem_instance import ProblemInstance
 from solution_instance import SolutionInstance
@@ -24,6 +25,8 @@ class SimulatedAnnealing:
         self.final_temp = final_temperature
         self.equi_iter = equilibrium_iterations
         self.alpha = alpha
+
+        self.meta_inf = MetaInformation()
 
     def metropolis_criterion(self, solution_instance: SolutionInstance, delta_obj) -> bool:
         if solution_instance.is_better_obj(0, delta_obj):                            # Is solution objectively better?
@@ -48,9 +51,12 @@ class SimulatedAnnealing:
                         f"Iteration {iteration}: Rejected move with delta={delta}, violations={self.solution_instance.violation_count}")
 
                 iteration += 1
+                self.meta_inf.inc_iterations()
 
-                self.cool_down()
-                print(f"Cooled down to temperature: {self.temperature}\n")
+            self.cool_down()
+            self.meta_inf.add_iteration_data(self.solution_instance.violation_count)
+            print(f"Cooled down to temperature: {self.temperature}\n")
+        self.meta_inf.set_final_obj(self.solution_instance.violation_count)
         return self.solution_instance
 
 
