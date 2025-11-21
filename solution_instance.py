@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import random
 from enum import Enum
 
 import numpy as np
-from Tools.scripts.texi2html import increment
 
 from neighborhood import Neighborhood
 from problem_instance import ProblemInstance
@@ -14,90 +15,155 @@ class InitMethodEnum(Enum):
     GREEDY = 'greedy'
     ROUND_ROBIN = 'round_robin'
 
+
 class SolutionInstance:
-    """Represents a complete solution/schedule and manages the conflict tracking."""
+    """Represents a complete solution/schedule and manages the conflict tracking.
+
+    The only ground truth for violations is the schedule itself.
+    The conflict matrix is always rebuilt from the schedule when needed,
+    so that the reported violation count is consistent with the actual
+    pairings in the schedule.
+    """
 
     def __init__(self, problem_inst: ProblemInstance, initial_solution_method, neighborhood: Neighborhood):
         self.problem_instance = problem_inst
-        self.schedule = []
-        self.conflicts = np.zeros((self.problem_instance.num_players, self.problem_instance.num_players),
-                                  dtype=np.int8)
-
+        self.schedule: list[list[list[int]]] = []
+        # conflict matrix: conflicts[i][j] = number of times i and j were in the same group
+        self.conflicts: np.ndarray | None = None
         self.neighborhood = neighborhood
-        self.violation_count = None
-
-        method_map = {
-            InitMethodEnum.RANDOM: self.generate_random_solution,
-            InitMethodEnum.GREEDY: self.generate_greedy_solution
-        }
+        self.violation_count: int = 0
 
         if initial_solution_method is None:
             initial_solution_method = SolutionInstance.generate_random_solution
-        initial_solution_method(self)
 
-    def is_better_obj(self, old_obj, new_obj):
+        # Build initial schedule
+        initial_solution_method(self)
+        # Ensure conflicts/violations are consistent with the schedule
+        self.rebuild_conflicts_and_violations()
+
+    # ------------------------------------------------------------------
+    # Objective handling
+    # ------------------------------------------------------------------
+    @staticmethod
+    def is_better_obj(old_obj: int, new_obj: int) -> bool:
+        """Return True if the delta new_obj is strictly improving.
+
+        In simulated annealing we pass old_obj=0 and new_obj=delta, so
+        this returns True exactly when delta < 0.
+        """
         return new_obj < old_obj
 
-    def calc_objective(self):
-        return self.conflicts.sum()
+    def calc_objective(self) -> int:
+        """Return the current objective value (sum of conflicts).
 
-    def generate_random_solution(self):
-        players = list(range(self.problem_instance.num_players))  # [0, 1, 2, ..., num_players-1]
+        This is not used by the SA driver for acceptance, but can be
+        handy for debugging. It is defined as the sum of the conflict
+        matrix entries.
+        """
+        if self.conflicts is None:
+            self.rebuild_conflicts_and_violations()
+        return int(self.conflicts.sum())
+
+    # ------------------------------------------------------------------
+    # Initial solution
+    # ------------------------------------------------------------------
+    def generate_random_solution(self) -> None:
+        """Generate a random feasible schedule.
+
+        For each week the players are shuffled, then split into equally
+        sized groups. One player will sit out each week when the number
+        of players is not divisible by groups * groupsize.
+        """
+        players = list(range(self.problem_instance.num_players))
+        num_groups = self.problem_instance.num_groups
+        group_size = self.problem_instance.groupsize
+
         self.schedule = []
-        self.conflicts = np.zeros(
-            (self.problem_instance.num_players, self.problem_instance.num_players),
-            dtype=np.int8
-        )
 
-        for week in range(self.problem_instance.num_weeks):
+        for _week in range(self.problem_instance.num_weeks):
             random.shuffle(players)
-
-            # Split into groups
-            week_schedule = []
-            for g in range(self.problem_instance.num_groups):
-                start = g * self.problem_instance.groupsize
-                end = start + self.problem_instance.groupsize
+            week_schedule: list[list[int]] = []
+            for g in range(num_groups):
+                start = g * group_size
+                end = start + group_size
                 group = players[start:end]
                 week_schedule.append(group)
-
-                # Update conflict matrix for this group
-                self._update_conflicts_for_group(group, inc=1)
-
             self.schedule.append(week_schedule)
 
-        self.count_violations()
+    def generate_greedy_solution(self) -> None:
+        """Placeholder for a greedy construction heuristic (not implemented)."""
+        raise NotImplementedError("Greedy initialisation is not implemented yet.")
 
+    # ------------------------------------------------------------------
+    # Conflict / violation computation from schedule
+    # ------------------------------------------------------------------
+    def rebuild_conflicts_and_violations(self) -> int:
+        """Rebuild the conflict matrix and violation count from the schedule.
 
+        This scans all weeks and groups and counts how many times each
+        pair of players has been grouped together.
+        """
+        n = self.problem_instance.num_players
+        conflicts = np.zeros((n, n), dtype=np.int16)
 
-    def generate_greedy_solution(self):
-        pass
+        for week in self.schedule:
+            for group in week:
+                for i in range(len(group)):
+                    for j in range(i + 1, len(group)):
+                        a = group[i]
+                        b = group[j]
+                        conflicts[a, b] += 1
+                        conflicts[b, a] += 1
 
-    def _update_conflicts_for_group(self, group, inc):
-        """Add/remove conflicts for all pairs in a group"""
-        for i in range(len(group)):
-            for j in range(i + 1, len(group)):
-                player_a = group[i]
-                player_b = group[j]
-                self.conflicts[player_a][player_b] += inc
-                self.conflicts[player_b][player_a] += inc
+        # Number of violating pairs = number of (i,j) with conflicts[i,j] > 1
+        violations = 0
+        for i in range(n):
+            for j in range(i + 1, n):
+                if conflicts[i, j] > 1:
+                    violations += 1
 
-    def count_violations(self):
-        """Count pairs that played together more than once"""
-        # Count all entries > 1 and divide by 2 (since matrix is symmetric)
-        self.violation_count = np.sum(self.conflicts > 1) // 2
-        return self.violation_count
+        self.conflicts = conflicts
+        self.violation_count = violations
+        return violations
 
-    def generate_random_neighborhood_move(self):
-        delta = self.neighborhood.generate_random_neighborhood_move(self.problem_instance, self.schedule, self.conflicts)
+    def count_violations(self) -> int:
+        """Public wrapper to recompute and return the current violation count."""
+        return self.rebuild_conflicts_and_violations()
+
+    # ------------------------------------------------------------------
+    # Neighborhood integration
+    # ------------------------------------------------------------------
+    def generate_random_neighborhood_move(self) -> int:
+        """Ask the neighborhood to propose a move and return its delta.
+
+        The neighborhood is passed the schedule (and the conflict matrix,
+        which it may ignore) and must return the change in violations
+        if that move were applied.
+        """
+        if self.conflicts is None:
+            self.rebuild_conflicts_and_violations()
+        delta = self.neighborhood.generate_random_neighborhood_move(
+            self.problem_instance,
+            self.schedule,
+            self.conflicts,
+        )
         return delta
 
-    def apply_neighborhood_move(self, delta):
-        """Apply move and track violations"""
-        self.neighborhood.apply_neighborhood_move(self.schedule, self.conflicts)
-        self.violation_count += delta #TODO violation count with delta doesnt match with the one calculated with count_violations()
-        self.count_violations() # TODO remove if delta eval works
+    def apply_neighborhood_move(self, delta: int) -> None:
+        """Apply the previously generated move and recompute violations.
 
-    def __str__(self):
+        The delta argument is not used to update the objective directly;
+        instead the conflicts and violation count are rebuilt from
+        the schedule to keep them truthful.
+        """
+        self.neighborhood.apply_neighborhood_move(self.schedule, self.conflicts)
+        # After applying the move, recompute the true conflicts/violations
+        self.rebuild_conflicts_and_violations()
+
+    # ------------------------------------------------------------------
+    # Pretty-printing
+    # ------------------------------------------------------------------
+    def __str__(self) -> str:
         output = f"Violation Count: {self.violation_count}\n"
         for week_idx, week in enumerate(self.schedule):
             output += f"Week {week_idx}:\n"
@@ -107,12 +173,11 @@ class SolutionInstance:
 
 
 if __name__ == '__main__':
-    problem_instance = ProblemInstance(3,10,4)
+    problem_instance = ProblemInstance(3, 10, 4)
     neighborhood = Swap2Player()
     solution_instance = SolutionInstance(problem_instance, SolutionInstance.generate_random_solution, neighborhood)
     print(solution_instance)
     delta = solution_instance.generate_random_neighborhood_move()
     solution_instance.apply_neighborhood_move(delta)
-
     print(solution_instance.violation_count)
     print(solution_instance.count_violations())
