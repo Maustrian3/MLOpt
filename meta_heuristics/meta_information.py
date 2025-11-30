@@ -6,6 +6,7 @@ class MetaInformation:
         self.iterations = 0
         self.obj_per_iteration = []
         self.final_obj = 0
+        self.label = ''
 
     def inc_iterations(self):
         """Set the number of iterations."""
@@ -60,20 +61,18 @@ class MetaInformationPlotter:
         plt.figure(figsize=(10, 5))
 
         for meta in meta_infos:
-            plt.plot(
-                meta.obj_per_iteration,
-                linewidth=2.0,  # thinner line
-                alpha=1.0,  # more transparent
-                marker = 'o',
-            )
+            y = meta.obj_per_iteration
+            if y is None:
+                continue  # or raise an error if you prefer
 
-        # avg_meta = MetaInformation.average(meta_infos)
-        # plt.plot(
-        #     avg_meta.obj_per_iteration,
-        #     linewidth=2.0,  # thicker line
-        #     marker='o',
-        #     label='Average objective'
-        # )
+            label = meta.label
+
+            plt.plot(
+                y,
+                linewidth=1.5,
+                alpha=0.9,
+                label=label,
+            )
 
         plt.title(f"{title_prefix}Objective Per Iteration")
         plt.xlabel("Iteration")
