@@ -5,11 +5,11 @@ import random
 outfile = "SGP_test_instances.csv"
 
 # Number of random instances for each week value
-num_instances_per_week = 11
+num_instances_per_week = 15
 
 # Input search ranges
-num_golfers = range(8, 61)
-num_weeks = range(2, 11)
+num_golfers = range(8, 32)
+num_weeks = range(2, 9)
 num_groups = range(2, 13)
 
 # Storage for final picked instances
@@ -22,12 +22,19 @@ for week in num_weeks:
 
     for golfer in num_golfers:
         for group in num_groups:
+            golfers_per_group = golfer // group
 
             # groups must divide golfers
             if golfer % group != 0:
                 continue
 
-            # skip nonsense (optional)
+            # Each golfer plays with (golfers_per_group − 1) other golfers per week.
+            # Across W weeks, they meet at most: [weeks * (golfers_per_group - 1)]
+            # So there must be more group capacity than golfers [weeks * (golfers_per_group – 1)] ≥ [(golfers – 1)]
+            if week * (golfers_per_group - 1) >= (golfer - 1):
+                continue
+
+            # skip nonsense
             if week > golfer:
                 continue
 
