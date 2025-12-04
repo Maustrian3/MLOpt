@@ -17,52 +17,33 @@ OUTPUT_FILE = "SGP_dataset.csv"
 
 SA_TIME_LIMIT = 100.0      # seconds for full SA run
 EXACT_TIME_LIMIT = 100.0   # seconds for OR-Tools CP-SAT
-PROBE_TIME = 1.0           # seconds for SA probing run (ls_improv_rate)
+PROBE_TIME = 0.5     # time (s) for probing run
 
 
 
-def compute_ls_improv_rate(num_golfers: int,
+def compute_probe_conflicts(num_golfers: int,
                            num_weeks: int,
                            num_groups: int,
                            probe_time: float = PROBE_TIME) -> float:
     """
-    Runs a short local-search-style probing.
-
     Returns:
-        ls_improv_rate = (violations_initial - violations_final) / iterations
+        xx
     """
-    group_size = num_golfers // num_groups
 
-    # NOTE: adjust the ProblemInstance(...) call if your signature differs.
-    problem = ProblemInstance(num_golfers, num_weeks, group_size)
+    solver = solve_social_golfer(num_golfers=num_golfers,
+                                 num_groups=num_groups,
+                                 num_weeks=num_weeks,
+                                 return_solver=True,
+                                 max_time=probe_time)
 
-    neighborhood = Swap2Player()
-    solution = SolutionInstance(problem, SolutionInstance.generate_random_solution, neighborhood)
-
-    start_viol = solution.violation_count
-    start_time = time.time()
-    iterations = 0
-
-    while time.time() - start_time < probe_time:
-        delta = solution.generate_random_neighborhood_move()
-        # We just apply moves; we don't care about SA acceptance here.
-        solution.apply_neighborhood_move(delta)
-        iterations += 1
-
-    end_viol = solution.violation_count
-
-    if iterations == 0:
-        return 0.0
-
-    ls_improv_rate = (start_viol - end_viol) / iterations
-    return ls_improv_rate
+    return solver.NumConflicts()
 
 
 
 def _sa_worker(num_golfers, num_weeks, num_groups, queue):
     """Worker process for running SA to completion (or until parameters stop)."""
-    group_size = num_golfers // num_groups
-    problem = ProblemInstance(num_golfers, num_weeks, group_size)
+
+    problem = ProblemInstance(num_groups, num_golfers, num_weeks)
 
     neighborhood = Swap2Player()
     solution = SolutionInstance(problem, SolutionInstance.generate_random_solution, neighborhood)
@@ -116,15 +97,23 @@ def run_sa_with_timeout(num_golfers, num_weeks, num_groups,
     return True, runtime
 
 
-def _exact_worker(num_golfers, num_weeks, num_groups, queue):
+def _exact_worker(num_golfers, num_weeks, num_groups, time_limit, queue):
     """
     Worker process for running the OR-Tools exact method.
     """
     start = time.time()
-    _ = solve_social_golfer(num_golfers=num_golfers,
+    result = solve_social_golfer(num_golfers=num_golfers,
                             num_groups=num_groups,
-                            num_weeks=num_weeks)
+                            num_weeks=num_weeks,
+                             max_time=time_limit)
     runtime = time.time() - start
+
+
+    # If no valid solution is found, throw exception to count as no solution found
+    if result is None:
+        raise Exception("No valid solution found.")
+
+    # Only send back runtime
     queue.put(runtime)
 
 
@@ -138,7 +127,7 @@ def run_exact_with_timeout(num_golfers, num_weeks, num_groups,
         runtime == time_limit if timeout occurred
     """
     q = mp.Queue()
-    p = mp.Process(target=_exact_worker, args=(num_golfers, num_weeks, num_groups, q))
+    p = mp.Process(target=_exact_worker, args=(num_golfers, num_weeks, num_groups, time_limit, q))
     p.start()
     p.join(timeout=time_limit)
 
@@ -197,7 +186,7 @@ def main():
             "num_groups",
             "group_size",
             "tightness_T",
-            "ls_improv_rate",
+            "probe_conflicts",
             "sa_runtime",
             "exact_runtime",
             "sa_finished",
@@ -218,9 +207,9 @@ def main():
             # 4. Tightness index T
             tightness_T = (num_weeks * (group_size - 1)) / (num_golfers - 1)
 
-            # 5. Local search gradient probe (1 second)
+            # 5. Local search gradient probe (x iterations)
             try:
-                ls_improv_rate = compute_ls_improv_rate(
+                probe_conflicts = compute_probe_conflicts(
                     num_golfers=num_golfers,
                     num_weeks=num_weeks,
                     num_groups=num_groups,
@@ -228,7 +217,7 @@ def main():
                 )
             except Exception as e:
                 print(f"[WARN] LS probe failed for instance {row}: {e}")
-                ls_improv_rate = 0.0
+                probe_conflicts = 0.0
 
             # Run SA with timeout
             sa_finished, sa_runtime = run_sa_with_timeout(
@@ -258,7 +247,7 @@ def main():
                 "num_groups": num_groups,
                 "group_size": group_size,
                 "tightness_T": tightness_T,
-                "ls_improv_rate": ls_improv_rate,
+                "probe_conflicts": probe_conflicts,
                 "sa_runtime": sa_runtime,
                 "exact_runtime": exact_runtime,
                 "sa_finished": int(sa_finished),
@@ -272,5 +261,4 @@ def main():
 
 
 if __name__ == "__main__":
-    # On Windows, multiprocessing needs the 'if __name__ == "__main__"' guard.
     main()
