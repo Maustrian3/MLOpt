@@ -5,9 +5,9 @@ from enum import Enum
 
 import numpy as np
 
-from neighborhood import Neighborhood
-from problem_instance import ProblemInstance
-from swap_2_player import Swap2Player
+from meta_heuristics.neighborhood import Neighborhood
+from meta_heuristics.problem_instance import ProblemInstance
+from meta_heuristics.swap_2_player import Swap2Player
 
 
 class InitMethodEnum(Enum):

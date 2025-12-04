@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from problem_instance import ProblemInstance
+from meta_heuristics.problem_instance import ProblemInstance
 
 
 class Neighborhood(ABC):
