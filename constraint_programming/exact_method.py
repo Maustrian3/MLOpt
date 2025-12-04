@@ -14,7 +14,7 @@ from ortools.sat.python import cp_model
 from verficiation.verify import verify_solution
 
 
-def solve_social_golfer(num_golfers, num_groups, num_weeks):
+def solve_social_golfer(num_golfers, num_groups, num_weeks, max_time, return_solver: bool = False, logging: bool = False):
     """
     Solve the social golfer problem.
 
@@ -80,18 +80,23 @@ def solve_social_golfer(num_golfers, num_groups, num_weeks):
 
     # Create solver and solve
     solver = cp_model.CpSolver()
-    # solver.parameters.max_time_in_seconds = 60.0
-    solver.parameters.log_search_progress = True
+    solver.parameters.max_time_in_seconds = max_time
+    solver.parameters.log_search_progress = logging
 
-    print(f"Solving Social Golfer Problem:")
-    print(f"  {num_golfers} golfers, {num_groups} groups of {group_size}, {num_weeks} weeks\n")
+    if logging:
+        print(f"Solving Social Golfer Problem:")
+        print(f"  {num_golfers} golfers, {num_groups} groups of {group_size}, {num_weeks} weeks\n")
 
     status = solver.Solve(model)
 
+    if return_solver:
+        return solver
+
     if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
-        print(f"\nSolution found!")
-        print(f"Status: {solver.StatusName(status)}")
-        print(f"Time: {solver.WallTime():.2f}s\n")
+        if logging:
+            print(f"\nSolution found!")
+            print(f"Status: {solver.StatusName(status)}")
+            print(f"Time: {solver.WallTime():.2f}s\n")
 
         # Extract solution
         schedule = []
@@ -105,19 +110,24 @@ def solve_social_golfer(num_golfers, num_groups, num_weeks):
                 week.append(sorted(group))
             schedule.append(week)
 
-        print("Schedule:")
-        for w, week in enumerate(schedule):
-            print(f"\nWeek {w + 1}:")
-            for g, group in enumerate(week):
-                print(f"  Group {g + 1}: {group}")
+        if logging:
+            print("Schedule:")
+            for w, week in enumerate(schedule):
+                print(f"\nWeek {w + 1}:")
+                for g, group in enumerate(week):
+                    print(f"  Group {g + 1}: {group}")
 
-        verify_solution(schedule, num_golfers, group_size)
+        if not verify_solution(schedule, num_golfers, group_size):
+            if logging:
+                print(f"\nSolution invalid.")
+                return None
 
         return schedule
     else:
-        print(f"\nNo solution found.")
-        print(f"Status: {solver.StatusName(status)}")
-        return None
+        if logging:
+            print(f"\nNo solution found.")
+            print(f"Status: {solver.StatusName(status)}")
+            return None
 
 
 if __name__ == "__main__":
