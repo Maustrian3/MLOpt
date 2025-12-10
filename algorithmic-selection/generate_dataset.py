@@ -17,7 +17,7 @@ OUTPUT_FILE = "SGP_dataset.csv"
 
 SA_TIME_LIMIT = 100.0      # seconds for full SA run
 EXACT_TIME_LIMIT = 100.0   # seconds for OR-Tools CP-SAT
-PROBE_TIME = 0.5     # time (s) for probing run
+PROBE_TIME = 3     # time (s) for probing run
 
 
 
@@ -33,10 +33,11 @@ def compute_probe_conflicts(num_golfers: int,
     solver = solve_social_golfer(num_golfers=num_golfers,
                                  num_groups=num_groups,
                                  num_weeks=num_weeks,
+                                 presolve=False,
                                  return_solver=True,
                                  max_time=probe_time)
 
-    return solver.NumConflicts()
+    return solver.ResponseProto().num_integer_propagations
 
 
 
