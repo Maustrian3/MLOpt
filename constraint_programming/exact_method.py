@@ -14,18 +14,9 @@ from ortools.sat.python import cp_model
 from verficiation.verify import verify_solution
 
 
-def solve_social_golfer(num_golfers, num_groups, num_weeks, max_time, return_solver: bool = False, logging: bool = False):
-    """
-    Solve the social golfer problem.
+def solve_social_golfer(num_golfers, num_groups, num_weeks, max_time,
+                        presolve = True,return_solver: bool = False, logging: bool = False):
 
-    Args:
-        num_golfers: Number of golfers
-        num_groups: Number of groups per week
-        num_weeks: Number of weeks to schedule
-
-    Returns:
-        Solution as a list of weeks, each containing groups of golfer IDs
-    """
     group_size = int(num_golfers / num_groups)
 
     model = cp_model.CpModel()
@@ -87,6 +78,8 @@ def solve_social_golfer(num_golfers, num_groups, num_weeks, max_time, return_sol
         print(f"Solving Social Golfer Problem:")
         print(f"  {num_golfers} golfers, {num_groups} groups of {group_size}, {num_weeks} weeks\n")
 
+    solver.parameters.cp_model_presolve = presolve
+
     status = solver.Solve(model)
 
     if return_solver:
@@ -131,4 +124,15 @@ def solve_social_golfer(num_golfers, num_groups, num_weeks, max_time, return_sol
 
 
 if __name__ == "__main__":
-    solve_social_golfer(num_golfers=32, num_groups=8, num_weeks=6)
+    solver = solve_social_golfer(num_golfers=32,
+                                 num_groups=8,
+                                 num_weeks=6,
+                                 max_time=3,
+                                 presolve=False,
+                                 return_solver=True,
+                                 logging=True
+                                 )
+    print("-"*30)
+    print(solver.ResponseStats())
+    print("+"*30)
+    print(solver.ResponseProto().num_integer_propagations)
