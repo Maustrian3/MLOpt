@@ -5,8 +5,8 @@ from typing import List
 
 import numpy as np
 
-from neighborhood import Neighborhood
-from problem_instance import ProblemInstance
+from meta_heuristics.neighborhood import Neighborhood
+from meta_heuristics.problem_instance import ProblemInstance
 
 
 # Swap two players with the same
