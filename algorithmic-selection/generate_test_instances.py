@@ -5,7 +5,7 @@ import random
 outfile = "SGP_test_instances.csv"
 
 # Number of random instances for each week value
-num_instances_per_week = 5
+num_instances_per_week = 50
 
 # Input search ranges
 num_golfers = range(8, 32)

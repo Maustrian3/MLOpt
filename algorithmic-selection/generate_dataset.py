@@ -25,10 +25,6 @@ def compute_probe_conflicts(num_golfers: int,
                            num_weeks: int,
                            num_groups: int,
                            probe_time: float = PROBE_TIME) -> float:
-    """
-    Returns:
-        xx
-    """
 
     solver = solve_social_golfer(num_golfers=num_golfers,
                                  num_groups=num_groups,
