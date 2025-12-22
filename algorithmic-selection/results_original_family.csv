@@ -1,0 +1,6 @@
+num_golfers,num_groups,num_weeks,group_size,tightness_T,probe_conflicts,sa_runtime,exact_runtime,sa_finished,exact_finished,winner,predicted_winner
+32,8,6,4,0.5806451612903226,0.0,100.0,100.0,0,0,none,sa
+32,8,7,4,0.6774193548387096,0.0,100.0,100.0,0,0,none,sa
+32,8,8,4,0.7741935483870968,0.0,100.0,100.0,0,0,none,sa
+32,8,9,4,0.8709677419354839,0.0,100.0,100.0,0,0,none,sa
+32,8,10,4,0.967741935483871,0.0,100.0,100.0,0,0,none,sa
