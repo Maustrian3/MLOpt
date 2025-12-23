@@ -1,4 +1,3 @@
-# TODO use verification also for meta heuristic solution
 def verify_solution(schedule, num_golfers, group_size, logging: bool = False):
     """Verify that the solution satisfies all constraints."""
     if logging:

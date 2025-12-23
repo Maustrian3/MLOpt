@@ -8,8 +8,8 @@ outfile = "SGP_test_instances.csv"
 num_instances_per_week = 15
 
 # Input search ranges
-num_golfers = range(8, 33)  # Because the classic SGP includes 32 golfers, we extend the range to include 32 -Kaan
-num_weeks = range(2, 11)    # Because the required original family uses weeks 6..10, we extend weeks to include 10 -Kaan
+num_golfers = range(8, 33)  # Because the classic SGP includes 32 golfers, we extend the range to include 32
+num_weeks = range(2, 11)    # Because the required original family uses weeks 6..10, we extend weeks to include 10
 num_groups = range(2, 13)
 
 # Storage for final picked instances
@@ -49,15 +49,15 @@ for week in num_weeks:
     final_instances.extend(chosen)
 
 # Because the project explicitly requires the original SGP family (32 golfers, 8 groups of 4, weeks 6..10),
-# we force-add these instances even if random sampling misses them -Kaan
+# we force-add these instances even if random sampling misses them
 required_original_family = [(32, w, 8) for w in range(6, 11)]
 final_instances.extend(required_original_family)
 
 # Because duplicates can appear (random sampling might already include some required rows),
-# we de-duplicate to keep one row per instance triple -Kaan
+# we de-duplicate to keep one row per instance triple
 final_instances = list(set(final_instances))
 
-# Because the CSV is easier to inspect/debug when ordered, we sort by (weeks, golfers, groups) -Kaan
+# Because the CSV is easier to inspect/debug when ordered, we sort by (weeks, golfers, groups)
 final_instances.sort(key=lambda t: (t[1], t[0], t[2]))
 
 # Write CSV file

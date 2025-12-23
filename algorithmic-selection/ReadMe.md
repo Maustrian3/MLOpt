@@ -17,16 +17,11 @@ T = num_weeks * (group_size - 1) / (num_golfers - 1)
 - `T` close to 1 → golfers must almost exhaust all possible opponents → **very tight** instance.  
 - `T` much smaller than 1 → looser constraints, more flexibility.
 
-### TODO Mention some combinatoric
-Reference: ChatGPT
-
-### 5. Local search gradient probe `ls_improv_rate`
+### 5. Exact method probe conflicts `probe_conflicts`
 **Definition:**  
 Run a local search (e.g., pair swap) for *5–20 iterations* starting from a random solution.  
 Measure how much the conflict count improves.
 
-`ls_improv_rate = (conflicts_initial - conflicts_after) / iterations`
-
 **Interpretation:**  
-- High improvement → the search landscape is smooth → metaheuristics are likely to perform well.  
-- Low or zero improvement → the search landscape is flat → exact solvers may handle this structure better.
+- High number of conflicts → Complex problem.  
+- Low/0 number of conflicts → Easier problem.
