@@ -14,7 +14,7 @@ from ortools.sat.python import cp_model
 from verficiation.verify import verify_solution
 
 
-def solve_social_golfer(num_golfers, num_groups, num_weeks, max_time,
+def solve_social_golfer(partial_schedule, num_golfers, num_groups, num_weeks, max_time,
                         presolve = True,return_solver: bool = False, logging: bool = False):
 
     group_size = int(num_golfers / num_groups)
@@ -27,6 +27,20 @@ def solve_social_golfer(num_golfers, num_groups, num_weeks, max_time,
         for g in range(num_groups):
             for p in range(num_golfers):
                 play[(w, g, p)] = model.NewBoolVar(f'play_w{w}_g{g}_p{p}')
+
+    # Repair constraint: All already assigned golfers need to be respected
+    for w in range(num_weeks):
+        for g in range(num_groups):
+            group = partial_schedule[w][g]
+
+            if group:
+                group_set = set(group)
+
+                for p in range(num_golfers):
+                    if p in group_set:
+                        model.Add(play[(w, g, p)] == 1)
+                    else:
+                        model.Add(play[(w, g, p)] == 0)
 
     # Constraint 1: Each golfer plays exactly once per week
     for w in range(num_weeks):
@@ -56,18 +70,6 @@ def solve_social_golfer(num_golfers, num_groups, num_weeks, max_time,
             # Sum of meetings must be at most 1
             # So they can meet 0 or 1 times
             model.Add(sum(meet_vars) <= 1)
-
-    # TODO Breaking symmetry reduces possible solution which come from combinatorial permutation which lead to the same solution
-    #  Maybe measure impact of symmetry breaking, would be interesting?
-    # Symmetry breaking: Fix first week to reduce search space
-    # Assign golfers 0..group_size-1 to group 0, etc.
-    for g in range(num_groups):
-        for p in range(g * group_size, (g + 1) * group_size):
-            model.Add(play[(0, g, p)] == 1)
-
-    # Symmetry breaking: Golfer 0 is always in group 0
-    for w in range(num_weeks):
-        model.Add(play[(w, 0, 0)] == 1)
 
     # Create solver and solve
     solver = cp_model.CpSolver()

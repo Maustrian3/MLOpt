@@ -5,9 +5,8 @@ from enum import Enum
 
 import numpy as np
 
-from meta_heuristics.neighborhood import Neighborhood
+from meta_heuristics.adaptive_large_neighborhood_search import ALNS
 from meta_heuristics.problem_instance import ProblemInstance
-from meta_heuristics.swap_2_player import Swap2Player
 
 
 class InitMethodEnum(Enum):
@@ -25,13 +24,12 @@ class SolutionInstance:
     pairings in the schedule.
     """
 
-    def __init__(self, problem_inst: ProblemInstance, initial_solution_method, neighborhood: Neighborhood):
-        self.problem_instance = problem_inst
+    def __init__(self, problem_instance: ProblemInstance, initial_solution_method):
+        self.problem_inst = problem_instance
         self.schedule: list[list[list[int]]] = []
-        # conflict matrix: conflicts[i][j] = number of times i and j were in the same group
         self.conflicts: np.ndarray | None = None
-        self.neighborhood = neighborhood
         self.violation_count: int = 0
+        self.alns = ALNS(problem_instance)
 
         if initial_solution_method is None:
             initial_solution_method = SolutionInstance.generate_random_solution
@@ -74,13 +72,13 @@ class SolutionInstance:
         sized groups. One player will sit out each week when the number
         of players is not divisible by groups * groupsize.
         """
-        players = list(range(self.problem_instance.num_players))
-        num_groups = self.problem_instance.num_groups
-        group_size = self.problem_instance.groupsize
+        players = list(range(self.problem_inst.num_players))
+        num_groups = self.problem_inst.num_groups
+        group_size = self.problem_inst.groupsize
 
         self.schedule = []
 
-        for _week in range(self.problem_instance.num_weeks):
+        for _week in range(self.problem_inst.num_weeks):
             random.shuffle(players)
             week_schedule: list[list[int]] = []
             for g in range(num_groups):
@@ -103,7 +101,7 @@ class SolutionInstance:
         This scans all weeks and groups and counts how many times each
         pair of players has been grouped together.
         """
-        n = self.problem_instance.num_players
+        n = self.problem_inst.num_players
         conflicts = np.zeros((n, n), dtype=np.int16)
 
         for week in self.schedule:
@@ -130,35 +128,24 @@ class SolutionInstance:
         """Public wrapper to recompute and return the current violation count."""
         return self.rebuild_conflicts_and_violations()
 
-    # ------------------------------------------------------------------
-    # Neighborhood integration
-    # ------------------------------------------------------------------
-    def generate_random_neighborhood_move(self) -> int:
-        """Ask the neighborhood to propose a move and return its delta.
+    def repair(self):
+        self.schedule = self.alns.repair(self.schedule)
 
-        The neighborhood is passed the schedule (and the conflict matrix,
-        which it may ignore) and must return the change in violations
-        if that move were applied.
-        """
-        if self.conflicts is None:
-            self.rebuild_conflicts_and_violations()
-        delta = self.neighborhood.generate_random_neighborhood_move(
-            self.problem_instance,
-            self.schedule,
-            self.conflicts,
-        )
-        return delta
+    def destroy_weeks_2(self):
+        self.schedule = self.alns.destroy_weeks(self.schedule, 2)
 
-    def apply_neighborhood_move(self, delta: int) -> None:
-        """Apply the previously generated move and recompute violations.
+    def destroy_groups_03(self):
+        self.schedule = self.alns.destroy_groups(self.schedule, 0.3)
 
-        The delta argument is not used to update the objective directly;
-        instead the conflicts and violation count are rebuilt from
-        the schedule to keep them truthful.
-        """
-        self.neighborhood.apply_neighborhood_move(self.schedule, self.conflicts)
-        # After applying the move, recompute the true conflicts/violations
-        self.rebuild_conflicts_and_violations()
+    def destroy_player_pairs_2(self):
+        self.schedule = self.alns.destroy_conflicting_pairs(self.schedule, self.conflicts, 2)
+
+    def copy(self) -> SolutionInstance:
+        new = SolutionInstance(self.problem_inst, None)
+        new.schedule = [[group.copy() for group in week] for week in self.schedule]
+        new.conflicts = None
+        new.violation_count = self.violation_count
+        return new
 
     # ------------------------------------------------------------------
     # Pretty-printing
@@ -174,10 +161,5 @@ class SolutionInstance:
 
 if __name__ == '__main__':
     problem_instance = ProblemInstance(3, 10, 4)
-    neighborhood = Swap2Player()
-    solution_instance = SolutionInstance(problem_instance, SolutionInstance.generate_random_solution, neighborhood)
+    solution_instance = SolutionInstance(problem_instance, SolutionInstance.generate_random_solution)
     print(solution_instance)
-    delta = solution_instance.generate_random_neighborhood_move()
-    solution_instance.apply_neighborhood_move(delta)
-    print(solution_instance.violation_count)
-    print(solution_instance.count_violations())
