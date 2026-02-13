@@ -83,6 +83,8 @@ def solve_social_golfer(
             model.Add(sum(play[(w, g, p)] for p in range(num_golfers)) == group_size)
 
     # Constraint: no two golfers meet more than once across all weeks
+    pair_violations = []
+
     for p1 in range(num_golfers):
         for p2 in range(p1 + 1, num_golfers):
             meet_vars = []
@@ -92,7 +94,15 @@ def solve_social_golfer(
                     model.AddBoolAnd([play[(w, g, p1)], play[(w, g, p2)]]).OnlyEnforceIf(meet)
                     model.AddBoolOr([play[(w, g, p1)].Not(), play[(w, g, p2)].Not()]).OnlyEnforceIf(meet.Not())
                     meet_vars.append(meet)
-            model.Add(sum(meet_vars) <= 1)
+            # Count excess times of meeting of two players
+            excess = model.NewIntVar(0, num_weeks, f"pair_excess_{p1}_{p2}")
+            model.Add(excess >= sum(meet_vars) - 1)
+            model.Add(excess >= 0)
+            pair_violations.append(excess)
+
+    # Tell the model to minimize for pair violations
+    model.Minimize(sum(pair_violations))
+
 
     # Repair binding: respect fixed assignments in partial_schedule
     w_lim = min(len(partial_schedule), num_weeks)
@@ -125,6 +135,9 @@ def solve_social_golfer(
     solver.parameters.num_search_workers = 4
 
     status = solver.Solve(model)
+
+    total_pair_violations = sum(solver.Value(v) for v in pair_violations)
+    print(f"Total pair violations after solve: {total_pair_violations}")
 
     if return_solver:
         return solver  # type: ignore[return-value]
