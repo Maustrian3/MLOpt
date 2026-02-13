@@ -1,6 +1,7 @@
 """
 Task 1.2: RL-ALNS
 Train policy on 70% instances, test on 30%
+FIXED: Policy persists across all training instances
 """
 
 import csv
@@ -8,44 +9,49 @@ import time
 import random
 import torch
 from meta_heuristics.problem_instance import ProblemInstance
-from meta_heuristics.solution_instance import SolutionInstance
-from meta_heuristics.RL.dr_alns import train_dralns
 from meta_heuristics.RL.dr_alns_env import DRALNSEnv
 from meta_heuristics.RL.dr_alns_policy import DRALNSPolicy
+from meta_heuristics.RL.dr_alns import collect_trajectory, compute_returns, ppo_update
 
 
 def train_policy_on_multiple_instances(train_instances, epochs_per_instance=200):
-    """Train ONE policy across multiple instances"""
+    """
+    Train ONE policy across multiple instances.
+    """
     print(f"Training RL policy on {len(train_instances)} instances...")
     
-    # Create policy (shared across all instances)
+    # Create ONE policy (shared across ALL instances)
     policy = DRALNSPolicy(state_dim=7, num_actions=3)
     optimizer = torch.optim.Adam(policy.parameters(), lr=3e-4)
     
-    # Train on each instance
-    for epoch in range(3):  # 3 passes over all instances
+    # Train for multiple epochs over all instances
+    for epoch in range(3):  # 3 passes over entire training set
         print(f"\n=== Training Epoch {epoch+1}/3 ===")
         
         for i, (g, p, w) in enumerate(train_instances, 1):
             print(f"  [{i}/{len(train_instances)}] Training on {g}-{p}-{w}...")
             
             problem = ProblemInstance(g, p, w)
+            env = DRALNSEnv(problem, max_steps=100)
             
-            # Use existing train_dralns function
-            # But we need to modify it to use existing policy...
-            # For now, train fresh on each (suboptimal but works)
-            trained_policy = train_dralns(
-                problem,
-                num_destroy_ops=3,
-                max_env_steps=100,
-                rollout_horizon=50,
-                epochs=epochs_per_instance
-            )
-            
-            # In ideal case, we'd accumulate gradients, but this works
-            policy = trained_policy  # Use last trained policy
+            # Train the SHARED policy on this environment
+            for _ in range(epochs_per_instance):
+                # Collect trajectory
+                states, actions, rewards, log_probs, values = collect_trajectory(
+                    env, policy, horizon=50
+                )
+                
+                # Compute returns
+                returns = compute_returns(rewards)
+                
+                # Update policy (weights accumulate!)
+                ppo_update(
+                    policy, optimizer,
+                    states, actions, log_probs,
+                    returns, values
+                )
     
-    # Save policy
+    # Save the trained policy
     torch.save(policy.state_dict(), 'rl_policy.pth')
     print("\n✅ Policy trained and saved to rl_policy.pth")
     
@@ -54,7 +60,7 @@ def train_policy_on_multiple_instances(train_instances, epochs_per_instance=200)
 
 def test_policy_on_instance(policy, groups, players, weeks, max_steps=200):
     """Test trained policy on one instance"""
-    print(f"\n[RL] Testing {groups}-{players}-{weeks}...", end=" ")
+    print(f"[RL] Testing {groups}-{players}-{weeks}...", end=" ")
     
     try:
         problem = ProblemInstance(groups, players, weeks)
@@ -65,7 +71,7 @@ def test_policy_on_instance(policy, groups, players, weeks, max_steps=200):
         
         start = time.time()
         
-        # Run policy (greedy - no exploration)
+        # Run policy (greedy  no exploration)
         for step in range(max_steps):
             with torch.no_grad():
                 logits, _ = policy(state)
@@ -100,12 +106,25 @@ def test_policy_on_instance(policy, groups, players, weeks, max_steps=200):
 
 
 def main():
+    """
+    COMPLETE main function with all steps:
+    1. Load instances
+    2. Split 70/30
+    3. Train on 70%
+    4. Test on 30%
+    5. Save results
+    """
+    
     # Load instances
     instances = []
-    with open('sgp_all_instances.csv', 'r') as f:
+    with open('sgp_all_instances.csv', 'r') as f:  
         reader = csv.DictReader(f)
         for row in reader:
-            instances.append((int(row['num_groups']), int(row['num_players']), int(row['num_weeks'])))
+            instances.append((
+                int(row['num_groups']),
+                int(row['num_players']),
+                int(row['num_weeks'])
+            ))
     
     # Split 70/30
     random.seed(42)
@@ -120,10 +139,10 @@ def main():
     print(f"  Test set: {len(test_instances)} instances")
     print(f"{'='*60}")
     
-    # Train
+    # STEP 1: Train (policy persists across all instances)
     policy = train_policy_on_multiple_instances(train_instances, epochs_per_instance=200)
     
-    # Test
+    # STEP 2: Test on unseen instances
     print(f"\n{'='*60}")
     print(f"Testing trained policy on {len(test_instances)} instances")
     print(f"{'='*60}")
@@ -135,16 +154,19 @@ def main():
         if result:
             results.append(result)
     
-    # Save
-    with open('task1_2_results.csv', 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=results[0].keys())
-        writer.writeheader()
-        writer.writerows(results)
-    
-    print(f"\n{'='*60}")
-    print(f"✅ Task 1.2 Complete! Tested {len(results)}/{len(test_instances)}")
-    print(f"   Results -> task1_2_results.csv")
-    print(f"{'='*60}")
+    # STEP 3: Save results
+    if results:
+        with open('task1_2_results.csv', 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=results[0].keys())
+            writer.writeheader()
+            writer.writerows(results)
+        
+        print(f"\n{'='*60}")
+        print(f"✅ Task 1.2 Complete! Tested {len(results)}/{len(test_instances)}")
+        print(f"   Results -> task1_2_results.csv")
+        print(f"{'='*60}")
+    else:
+        print("\n❌ No results to save!")
 
 
 if __name__ == "__main__":

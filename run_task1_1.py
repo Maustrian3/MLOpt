@@ -1,10 +1,11 @@
 """
 Task 1.1: Run MAB-ALNS on all instances
-Each instance gets a FRESH Multi-Armed Bandit
+FIXED: Dynamic conflict calculation
 """
 
 import csv
 import time
+import numpy as np
 from meta_heuristics.problem_instance import ProblemInstance
 from meta_heuristics.solution_instance import SolutionInstance
 from meta_heuristics.adaptive_large_neighborhood_search import ALNS
@@ -12,9 +13,35 @@ from meta_heuristics.MAB.alns_arm import ALNSArm
 from meta_heuristics.MAB.multi_armed_bandit import ALNSMultiArmedBandit
 
 
+def make_dynamic_conflict_destroyer(alns_helper, threshold=2):
+    """
+    Creates a conflict destroyer that computes conflicts DYNAMICALLY.
+    
+    WORKAROUND: Since MAB only passes schedules, we recompute conflicts
+    from the schedule every time this is called.
+    """
+    def destroy_with_dynamic_conflicts(schedule):
+        # Recompute conflicts from current schedule
+        n = alns_helper.problem_inst.num_players
+        conflicts = np.zeros((n, n), dtype=int)
+        
+        for week in schedule:
+            for group in week:
+                for i in range(len(group)):
+                    for j in range(i + 1, len(group)):
+                        p1, p2 = group[i], group[j]
+                        conflicts[p1, p2] += 1
+                        conflicts[p2, p1] += 1
+        
+        # Use fresh conflicts
+        return alns_helper.destroy_conflicting_pairs(schedule, conflicts, threshold)
+    
+    return destroy_with_dynamic_conflicts
+
+
 def run_mab_instance(groups, players, weeks, max_iter=100, seed=42):
     """Run MAB-ALNS on one instance"""
-    print(f"\n[MAB] {groups}-{players}-{weeks}...", end=" ")
+    print(f"[MAB] {groups}-{players}-{weeks}...", end=" ")
     
     try:
         problem = ProblemInstance(groups, players, weeks)
@@ -23,11 +50,11 @@ def run_mab_instance(groups, players, weeks, max_iter=100, seed=42):
         
         alns = ALNS(problem)
         
-        # 3 arms using SolutionInstance methods
+        # 3 arms - FIXED conflict destroyer
         arms = [
             ALNSArm("Destroy 2 Weeks", lambda s: alns.destroy_weeks(s, 2)),
             ALNSArm("Destroy 30% Groups", lambda s: alns.destroy_groups(s, 0.3)),
-            ALNSArm("Destroy Conflicts", lambda s: alns.destroy_conflicting_pairs(s, solution.conflicts, 2)),
+            ALNSArm("Destroy Conflicts", make_dynamic_conflict_destroyer(alns, 2)),
         ]
         
         # Fresh MAB for this instance
@@ -67,10 +94,14 @@ def run_mab_instance(groups, players, weeks, max_iter=100, seed=42):
 
 def main():
     instances = []
-    with open('sgp_all_instances.csv', 'r') as f:
+    with open('sgp_all_instances.csv', 'r') as f:  
         reader = csv.DictReader(f)
         for row in reader:
-            instances.append((int(row['num_groups']), int(row['num_players']), int(row['num_weeks'])))
+            instances.append((
+                int(row['num_groups']),
+                int(row['num_players']),
+                int(row['num_weeks'])
+            ))
     
     print(f"{'='*60}")
     print(f"TASK 1.1: MAB-ALNS on {len(instances)} instances")
