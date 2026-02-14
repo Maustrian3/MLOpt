@@ -1,4 +1,3 @@
-# compare_and_plot.py
 """
 Compare MAB vs RL and generate plots for slides
 """

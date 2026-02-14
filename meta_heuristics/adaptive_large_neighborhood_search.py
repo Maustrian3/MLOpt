@@ -29,7 +29,7 @@ class ALNS:
             num_weeks=self.problem_inst.num_weeks,
             max_time=30,
             presolve=True,
-            logging=True,
+            logging=False,
         )
 
     def destroy_weeks(self, schedule: List[List[List[int]]], destroy_weeks: int) -> List[List[List[int]]]:
