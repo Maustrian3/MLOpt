@@ -1,0 +1,45 @@
+{
+  "overall": {
+    "mab": {
+      "n": 102,
+      "perfect_n": 81,
+      "perfect_rate": 0.7941176470588235,
+      "avg_improvement": 12.029411764705882,
+      "avg_final_violations": 1.7745098039215685,
+      "avg_runtime_s": 160.91
+    },
+    "rl": {
+      "n": 31,
+      "perfect_n": 8,
+      "perfect_rate": 0.25806451612903225,
+      "avg_improvement": 3.6129032258064515,
+      "avg_final_violations": 6.741935483870968,
+      "avg_runtime_s": 21.03258064516129
+    }
+  },
+  "common_set": {
+    "mab": {
+      "n": 31,
+      "perfect_n": 24,
+      "perfect_rate": 0.7741935483870968,
+      "avg_improvement": 8.193548387096774,
+      "avg_final_violations": 0.8387096774193549,
+      "avg_runtime_s": 142.50677419354835
+    },
+    "rl": {
+      "n": 31,
+      "perfect_n": 8,
+      "perfect_rate": 0.25806451612903225,
+      "avg_improvement": 3.6129032258064515,
+      "avg_final_violations": 6.741935483870968,
+      "avg_runtime_s": 21.03258064516129
+    }
+  },
+  "head_to_head": {
+    "mab_wins": 19,
+    "rl_wins": 0,
+    "ties": 12,
+    "gap_mean": 5.903225806451613,
+    "gap_median": 2.0
+  }
+}

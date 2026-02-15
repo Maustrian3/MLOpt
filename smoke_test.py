@@ -115,4 +115,3 @@ if __name__ == "__main__":
         print("Task 1.1 plumbing is working with 3 operators!")
     else:
         print(" SOME TESTS FAILED")
-        print("Check the error messages above")

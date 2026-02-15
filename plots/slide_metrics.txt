@@ -1,0 +1,14 @@
+=== OVERALL ===
+MAB: n=102, perfect=81 (0.794), avg_impr=12.029, avg_final=1.775, avg_time_s=160.910
+RL : n=31, perfect=8 (0.258), avg_impr=3.613, avg_final=6.742, avg_time_s=21.033
+
+=== FAIR (COMMON INSTANCES) ===
+MAB(common): n=31, perfect=24 (0.774), avg_impr=8.194, avg_final=0.839, avg_time_s=142.507
+RL(common) : n=31, perfect=8 (0.258), avg_impr=3.613, avg_final=6.742, avg_time_s=21.033
+
+=== HEAD-TO-HEAD (COMMON) ===
+MAB wins: 19
+RL  wins: 0
+Ties    : 12
+Mean gap (RL - MAB): 5.903
+Median gap (RL - MAB): 2.000

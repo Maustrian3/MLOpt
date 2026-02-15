@@ -7,7 +7,6 @@ print("="*60)
 print("SIMPLE REPAIR TEST - FEASIBLE INSTANCE")
 print("="*60)
 
-# FEASIBLE instance: 9 players, 3 groups of 3, 4 weeks
 num_groups = 3
 num_players = 9
 num_weeks = 4
